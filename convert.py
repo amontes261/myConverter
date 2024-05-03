@@ -10,11 +10,13 @@ if __name__ == "__main__":
         print('\t\t-ldm : Convert to LEFT channel-focused dual-mono file')
         print('\t\t-rdm : Convert to RIGHT channel-focused dual-mono file')
         print('\t\t-f <dir_name>: Make folder to store new file(s) in')
+        print('\t\t-o [created, modified, name, size]: Specify conversion order when converting multiple files.')
         print()
         sys.exit(1)
 
     inputFilename = sys.argv[1]
     outputFilename = sys.argv[2]
+    conversionOrder = None
     deletionFlag = False
     leftDualMonoFlag = False
     rightDualMonoFlag = False
@@ -40,6 +42,22 @@ if __name__ == "__main__":
             if sys.argv[i] == '-f':
                 storeDirectory = sys.argv[i + 1]
 
+    if "-o" in sys.argv:
+        if inputFilename[0:5] != '_all_':
+            print("\n\tERROR: Ordering flag can not be used unless \"_all_\" is specified as the input filename.\n")
+            sys.exit(1)
+        elif sys.argv[-1] == '-o':
+            print("\n\tERROR: Last input argument can't be -o.\n")
+            sys.exit(1)
+        
+        for i in range(len(sys.argv) ):
+            if sys.argv[i] == '-o':
+                conversionOrder = sys.argv[i + 1]
+        
+        if conversionOrder not in ['created', 'modified', 'name', 'size']:
+            print('\n\tERROR: Specified conversion order must be one of "created", "modified", "name" or "size". \n')
+            sys.exit(1)
+
     # ===============================================================================================
 
     inputWithoutExtension = '.'.join(inputFilename.split('.')[:-1])
@@ -59,13 +77,28 @@ if __name__ == "__main__":
 
     if inputWithoutExtension == '_all_':
         # Indicates that ANY filename with the given input extension should be converted
-        files = os.listdir('./')
+
+        if conversionOrder:
+            if conversionOrder == 'created': # Most-original first
+                files = sorted(os.listdir(os.curdir), key=lambda x: os.path.getctime(os.path.join(os.curdir, x) ) )
+            elif conversionOrder == 'modified': # Most-original first
+                files = sorted(os.listdir(os.curdir), key=lambda x: os.path.getmtime(os.path.join(os.curdir, x) ) )
+            elif conversionOrder == 'name': # Alphabetical order
+                files = sorted(os.listdir(os.curdir) )
+            elif conversionOrder == 'size': # Smallest first
+                files = sorted(os.listdir(os.curdir), key=lambda x: os.path.getsize(os.path.join(os.curdir, x) ), reverse=True)
+            else:
+                print('\n\tERROR: Specified conversion order must be one of "created", "modified", "name" or "size". \n')
+                sys.exit(1)
+        else:
+            files = os.listdir(os.curdir)
+
         for f in files:
             if f.endswith(f'.{inputExtension}') and f[0] != '.':
                 targetFiles.append('.'.join(f.split('.')[:-1]) )
     else:
         targetFiles.append(inputWithoutExtension)
-
+    
     fileCounter = 1
     for f in targetFiles:
         calculatedOutputPath = ''
@@ -91,10 +124,12 @@ if __name__ == "__main__":
         else:
             ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath).run()
 
+        # ==========================================================================
+
         if deletionFlag:
                 os.remove(f"{f}.{inputExtension}")
 
-        # ==========================================================================
+        # ========================================
 
         fileCounter += 1
 
