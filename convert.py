@@ -9,7 +9,7 @@ if __name__ == "__main__":
         print('\t\t-rm : Delete input file(s) after conversion')
         print('\t\t-mkdir <dir_name>: Make folder to store new file(s) in')
         print('\t\t-c <percentage>: Compress the input file\'s bitrate by X%')
-        print('\t\t-o [created, modified, name, size]: Specify conversion order when converting multiple files.')
+        print('\t\t-o [created, modified, name, size]: Specify conversion order when converting multiple files')
         print('\t\t-left : Convert to LEFT channel-focused dual-mono file')
         print('\t\t-right : Convert to RIGHT channel-focused dual-mono file')
         print()
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     if "-left" in sys.argv and "-right" in sys.argv:
         print('\n\t>> ERROR: Invalid arguments.\n\t>> Can NOT use both \"-left\" and \"-right\"flags together."\n')
-        pass
+        sys.exit(1)
     elif "-left" in sys.argv:
         leftDualMonoFlag = True
     elif "-right" in sys.argv:
