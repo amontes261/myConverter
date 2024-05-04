@@ -6,41 +6,63 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print('\n\t>> ERROR: Invalid arguments.\n\t>> Usage: "python convert.py in_file out_file [ flags ]"\n')
         print('\tOptional flags:\n')
-        print('\t\t-d : Delete input file(s) after conversion')
-        print('\t\t-ldm : Convert to LEFT channel-focused dual-mono file')
-        print('\t\t-rdm : Convert to RIGHT channel-focused dual-mono file')
-        print('\t\t-f <dir_name>: Make folder to store new file(s) in')
+        print('\t\t-rm : Delete input file(s) after conversion')
+        print('\t\t-mkdir <dir_name>: Make folder to store new file(s) in')
+        print('\t\t-c <percentage>: Compress the input file\'s bitrate by X%')
         print('\t\t-o [created, modified, name, size]: Specify conversion order when converting multiple files.')
+        print('\t\t-left : Convert to LEFT channel-focused dual-mono file')
+        print('\t\t-right : Convert to RIGHT channel-focused dual-mono file')
         print()
         sys.exit(1)
 
     inputFilename = sys.argv[1]
     outputFilename = sys.argv[2]
+    compressionPercentage = None
     conversionOrder = None
     deletionFlag = False
     leftDualMonoFlag = False
     rightDualMonoFlag = False
     storeDirectory = None
 
-    if "-d" in sys.argv:
+    if "-rm" in sys.argv:
         deletionFlag = True
 
-    if "-ldm" in sys.argv and "-rdm" in sys.argv:
-        print('\n\t>> ERROR: Invalid arguments.\n\t>> Can NOT use both \"-ldm\" and \"-rdm\"flags together."\n')
+    if "-left" in sys.argv and "-right" in sys.argv:
+        print('\n\t>> ERROR: Invalid arguments.\n\t>> Can NOT use both \"-left\" and \"-right\"flags together."\n')
         pass
-    elif "-ldm" in sys.argv:
+    elif "-left" in sys.argv:
         leftDualMonoFlag = True
-    elif "-rdm" in sys.argv:
+    elif "-right" in sys.argv:
         rightDualMonoFlag = True
     
-    if "-f" in sys.argv:
-        if sys.argv[-1] == '-f':
-            print("\n\tERROR: Last input argument can't be -f.\n")
+    if "-mkdir" in sys.argv:
+        if sys.argv[-1] == '-mkdir':
+            print("\n\tERROR: Last input argument can't be -mkdir.\n")
             sys.exit(1)
 
         for i in range(len(sys.argv) ):
-            if sys.argv[i] == '-f':
+            if sys.argv[i] == '-mkdir':
                 storeDirectory = sys.argv[i + 1]
+
+    if "-c" in sys.argv:
+        if sys.argv[-1] == '-o':
+            print("\n\tERROR: Last input argument can't be -c.\n")
+            sys.exit(1)
+        
+        for i in range(len(sys.argv) ):
+            if sys.argv[i] == '-c':
+                try:
+                    compressionPercentage = int(sys.argv[i + 1])
+                    if compressionPercentage < 1 or compressionPercentage > 100:
+                        print("\n\tERROR: Compression percentage must range from 1 to 100, inclusively.\n")
+                        sys.exit(1)
+                except ValueError:
+                    print("\n\tERROR: Compression percentage must be an INTEGER.\n")
+                    sys.exit(1)
+
+        if compressionPercentage < 1 or compressionPercentage > 100 or type(compressionPercentage) == float:
+            print("\n\tERROR: Compression percentage must be an INTEGER, inclusively ranging from 1 to 100.\n")
+            sys.exit(1)
 
     if "-o" in sys.argv:
         if inputFilename[0:5] != '_all_':
@@ -98,7 +120,16 @@ if __name__ == "__main__":
                 targetFiles.append('.'.join(f.split('.')[:-1]) )
     else:
         targetFiles.append(inputWithoutExtension)
+
+    if leftDualMonoFlag:
+        audioFilter = 'pan=stereo|c0=c0|c1=c0'
+    elif rightDualMonoFlag:
+        audioFilter = 'pan=stereo|c0=c1|c1=c1'
+    else: # No change: keep left to left & keep right to right
+        audioFilter = 'pan=stereo|c0=c0|c1=c1'
     
+    # ========================================================
+
     fileCounter = 1
     for f in targetFiles:
         calculatedOutputPath = ''
@@ -115,16 +146,20 @@ if __name__ == "__main__":
             else:
                 calculatedOutputPath += f'{outputWithoutExtension} {fileCounter}.{outputExtension}'
 
+
         # =============================================================================================================
 
-        if leftDualMonoFlag:
-            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af='pan=stereo|c0=c0|c1=c0', ac=2).run()
-        elif rightDualMonoFlag:
-            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af='pan=stereo|c0=c1|c1=c1', ac=2).run()
-        else:
-            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath).run()
+        videoProbe = ffmpeg.probe(f'{f}.{inputExtension}')
+        actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'video')['bit_rate'])
 
-        # ==========================================================================
+        # Keep it lower than how it came in, but above 1000K
+        targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - compressionPercentage) / 100) ) )
+
+        # =============================================================================================================
+
+        ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
+
+        # ============================================================================================
 
         if deletionFlag:
                 os.remove(f"{f}.{inputExtension}")
