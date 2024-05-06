@@ -149,15 +149,22 @@ if __name__ == "__main__":
 
         # =============================================================================================================
 
-        videoProbe = ffmpeg.probe(f'{f}.{inputExtension}')
-        actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'video')['bit_rate'])
+        if compressionPercentage:
+            videoProbe = ffmpeg.probe(f'{f}.{inputExtension}')
+            try: # Try and get the bitrate of the video coming in. This will catch if only an audio file's coming in.
+                actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'video')['bit_rate'])
+            except StopIteration: # Case: Input file has NO video stream, so the bitrate will be pulled from the audio instead.
+                actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'audio')['bit_rate'])
 
-        # Keep it lower than how it came in, but above 1000K
-        targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - compressionPercentage) / 100) ) )
+            # Keep it lower than how it came in, but above 1000K
+            targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - compressionPercentage) / 100) ) )
 
         # =============================================================================================================
 
-        ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
+        if compressionPercentage:
+            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
+        else:
+            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2).run()
 
         # ============================================================================================
 
