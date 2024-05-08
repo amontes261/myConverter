@@ -162,5 +162,8 @@ cython_debug/
 #iCloud Drive Synchronization File
 .DS_Store
 
-# Local/Trash Files
+# Trash Files
 bin/
+
+# Local Files
+local/
