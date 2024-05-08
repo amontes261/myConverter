@@ -2,6 +2,8 @@ import ffmpeg
 import os
 import sys
 
+# =============================================================================================================
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print('\n\t>> ERROR: Invalid arguments.\n\t>> Usage: "python convert.py in_file out_file [ flags ]"\n')
@@ -52,21 +54,21 @@ if __name__ == "__main__":
         for i in range(len(sys.argv) ):
             if sys.argv[i] == '-c':
                 try:
-                    compressionPercentage = int(sys.argv[i + 1])
+                    compressionPercentage = float(sys.argv[i + 1])
                     if compressionPercentage < 1 or compressionPercentage > 100:
                         print("\n\tERROR: Compression percentage must range from 1 to 100, inclusively.\n")
                         sys.exit(1)
                 except ValueError:
-                    print("\n\tERROR: Compression percentage must be an INTEGER.\n")
+                    print("\n\tERROR: Compression percentage must be a FLOAT or INTEGER.\n")
                     sys.exit(1)
 
-        if compressionPercentage < 1 or compressionPercentage > 100 or type(compressionPercentage) == float:
-            print("\n\tERROR: Compression percentage must be an INTEGER, inclusively ranging from 1 to 100.\n")
+        if compressionPercentage < 1 or compressionPercentage > 100:
+            print("\n\tERROR: Compression percentage must range from 1 to 100.\n")
             sys.exit(1)
 
     if "-o" in sys.argv:
-        if inputFilename[0:5] != '_all_':
-            print("\n\tERROR: Ordering flag can not be used unless \"_all_\" is specified as the input filename.\n")
+        if inputFilename[0:5] != '{all}':
+            print("\n\tERROR: Ordering flag can not be used unless \"{all}\" is specified as the input filename.\n")
             sys.exit(1)
         elif sys.argv[-1] == '-o':
             print("\n\tERROR: Last input argument can't be -o.\n")
@@ -83,10 +85,10 @@ if __name__ == "__main__":
     # ===============================================================================================
 
     inputWithoutExtension = '.'.join(inputFilename.split('.')[:-1])
-    inputExtension = inputFilename.split('.')[-1]
+    inputExtension = inputFilename.split('.')[-1].lower()
 
     outputWithoutExtension = '.'.join(outputFilename.split('.')[:-1])
-    outputExtension = outputFilename.split('.')[-1]
+    outputExtension = outputFilename.split('.')[-1].lower()
 
     # ===============================================================================================
 
@@ -95,9 +97,9 @@ if __name__ == "__main__":
         if not os.path.exists(storeDirectory):
             os.makedirs(storeDirectory)
 
-    targetFiles = [] # Can be a list containing one file if file was specified, or a list of many if _all_ was used
+    targetFiles = [] # Can be a list containing one file if file was specified, or a list of many if {all} was used
 
-    if inputWithoutExtension == '_all_':
+    if inputWithoutExtension == '{all}':
         # Indicates that ANY filename with the given input extension should be converted
 
         if conversionOrder:
@@ -110,13 +112,13 @@ if __name__ == "__main__":
             elif conversionOrder == 'size': # Smallest first
                 files = sorted(os.listdir(os.curdir), key=lambda x: os.path.getsize(os.path.join(os.curdir, x) ), reverse=True)
             else:
-                print('\n\tERROR: Specified conversion order must be one of "created", "modified", "name" or "size". \n')
+                print('\n\tERROR: Specified conversion order must be one of "created", "modified", "name" or "size".\n')
                 sys.exit(1)
         else:
             files = os.listdir(os.curdir)
 
         for f in files:
-            if f.endswith(f'.{inputExtension}') and f[0] != '.':
+            if f.lower().endswith(f'.{inputExtension}') and f[0] != '.':
                 targetFiles.append('.'.join(f.split('.')[:-1]) )
     else:
         targetFiles.append(inputWithoutExtension)
@@ -137,15 +139,23 @@ if __name__ == "__main__":
         if storeDirectory:
             calculatedOutputPath += storeDirectory + '/'
 
-        if outputWithoutExtension == '_same_':
+        if outputWithoutExtension == "{same}":
             # Indicates that the name should remain the same with this new extension
             calculatedOutputPath += f'{f}.{outputExtension}'
-        else:
+        elif "{same}" not in outputWithoutExtension:
             if len(targetFiles) == 1:
                 calculatedOutputPath += f'{outputWithoutExtension}.{outputExtension}'
             else:
                 calculatedOutputPath += f'{outputWithoutExtension} {fileCounter}.{outputExtension}'
+        elif "{same}" in outputWithoutExtension:
+            if outputWithoutExtension.count("{same}") != 1:
+                print('\n\tERROR: "{same}" indicator should only appear ONCE in the specified output file string.\n')
+                sys.exit(1)
 
+            sameSplit = outputWithoutExtension.split("{same}")
+            ouputFilenameWithInput = f'{sameSplit[0]}{f}{sameSplit[1]}'
+            
+            calculatedOutputPath += f'{ouputFilenameWithInput}.{outputExtension}'
 
         # =============================================================================================================
 
