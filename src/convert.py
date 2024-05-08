@@ -141,6 +141,10 @@ if __name__ == "__main__":
 
         if outputWithoutExtension == "{same}":
             # Indicates that the name should remain the same with this new extension
+            if inputExtension == outputExtension:
+                # Add '.' to beginning of output file path to store converted data, changed on last-step
+                calculatedOutputPath += '.'
+            
             calculatedOutputPath += f'{f}.{outputExtension}'
         elif "{same}" not in outputWithoutExtension:
             if len(targetFiles) == 1:
@@ -154,7 +158,7 @@ if __name__ == "__main__":
 
             sameSplit = outputWithoutExtension.split("{same}")
             ouputFilenameWithInput = f'{sameSplit[0]}{f}{sameSplit[1]}'
-            
+
             calculatedOutputPath += f'{ouputFilenameWithInput}.{outputExtension}'
 
         # =============================================================================================================
@@ -171,15 +175,21 @@ if __name__ == "__main__":
 
         # =============================================================================================================
 
+        inputPath = f"{f}.{inputExtension}"
+
         if compressionPercentage:
-            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
+            ffmpeg.input(inputPath).output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
         else:
-            ffmpeg.input(f"{f}.{inputExtension}").output(calculatedOutputPath, af=audioFilter, ac=2).run()
+            ffmpeg.input(inputPath).output(calculatedOutputPath, af=audioFilter, ac=2).run()
 
         # ============================================================================================
 
-        if deletionFlag:
-                os.remove(f"{f}.{inputExtension}")
+        if inputPath == calculatedOutputPath[1:]:
+            # Remove '.' from beginning of converted file once input-file of the same name is deleted
+            os.remove(inputPath)
+            os.rename(calculatedOutputPath, calculatedOutputPath[1:])
+        elif deletionFlag:
+            os.remove(inputPath)
 
         # ========================================
 
