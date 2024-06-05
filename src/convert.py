@@ -1,30 +1,37 @@
 import ffmpeg
+import math
 import os
 import sys
 
 # =============================================================================================================
 
-if __name__ == "__main__":
+def convert():
     if len(sys.argv) < 3:
         print('\n\t>> ERROR: Invalid arguments.\n\t>> Usage: "python convert.py in_file out_file [ flags ]"\n')
         print('\tOptional flags:\n')
-        print('\t\t-rm : Delete input file(s) after conversion')
-        print('\t\t-mkdir <dir_name>: Make folder to store new file(s) in')
-        print('\t\t-c <percentage>: Compress the input file\'s bitrate by X%')
-        print('\t\t-o [created, modified, name, size]: Specify conversion order when converting multiple files')
+        print('\t\t-c <percentage> : Compress the input file\'s bitrate by X%')
+        print('\t\t-fs <size_in_MB> : Attempt to compress the input file\'s bitrate to an inputted size [ BETA ]')
+        print('\t\t-hflip : Horizontally flip video along the Y axis')
+        print('\t\t-mkdir <dir_name> : Make folder to store new file(s) in')
+        print('\t\t-o [created, modified, name, size] : Specify conversion order when converting multiple files')
         print('\t\t-left : Convert to LEFT channel-focused dual-mono file')
         print('\t\t-right : Convert to RIGHT channel-focused dual-mono file')
+        print('\t\t-rm : Delete input file(s) after conversion')
+        print('\t\t-vflip : Vertically flip video along the X axis')
         print()
         sys.exit(1)
 
     inputFilename = sys.argv[1]
     outputFilename = sys.argv[2]
+    compressionFileSize = None
     compressionPercentage = None
     conversionOrder = None
     deletionFlag = False
+    horizontalFlipFlag = False
     leftDualMonoFlag = False
     rightDualMonoFlag = False
     storeDirectory = None
+    verticalFlipFlag = False
 
     if "-rm" in sys.argv:
         deletionFlag = True
@@ -46,9 +53,33 @@ if __name__ == "__main__":
             if sys.argv[i] == '-mkdir':
                 storeDirectory = sys.argv[i + 1]
 
+    if "-fs" in sys.argv:
+        if sys.argv[-1] == '-fs':
+            print("\n\tERROR: Last input argument can't be -fs.\n")
+            sys.exit(1)
+            
+        if "-c" in sys.argv:
+            print("\n\tERROR: Can NOT declare both -fs and -c flags. Please use one or the other.\n")
+            sys.exit(1)
+        
+        for i in range(len(sys.argv) ):
+            if sys.argv[i] == '-fs':
+                try:
+                    compressionFileSize = float(sys.argv[i + 1])
+                    if compressionFileSize < 1:
+                        print("\n\tERROR: Compression file size must be 1MB or greater.\n")
+                        sys.exit(1)
+                except ValueError:
+                    print("\n\tERROR: Compression file size must be a FLOAT or INTEGER.\n")
+                    sys.exit(1)
+
     if "-c" in sys.argv:
-        if sys.argv[-1] == '-o':
+        if sys.argv[-1] == '-c':
             print("\n\tERROR: Last input argument can't be -c.\n")
+            sys.exit(1)
+
+        if "-fs" in sys.argv:
+            print("\n\tERROR: Can NOT declare both -c and -fs flags. Please use one or the other.\n")
             sys.exit(1)
         
         for i in range(len(sys.argv) ):
@@ -61,10 +92,6 @@ if __name__ == "__main__":
                 except ValueError:
                     print("\n\tERROR: Compression percentage must be a FLOAT or INTEGER.\n")
                     sys.exit(1)
-
-        if compressionPercentage < 1 or compressionPercentage > 100:
-            print("\n\tERROR: Compression percentage must range from 1 to 100.\n")
-            sys.exit(1)
 
     if "-o" in sys.argv:
         if inputFilename[0:5] != '{all}':
@@ -81,6 +108,12 @@ if __name__ == "__main__":
         if conversionOrder not in ['created', 'modified', 'name', 'size']:
             print('\n\tERROR: Specified conversion order must be one of "created", "modified", "name" or "size". \n')
             sys.exit(1)
+
+    if "-hflip" in sys.argv:
+        horizontalFlipFlag = True
+
+    if "-vflip" in sys.argv:
+        verticalFlipFlag = True
 
     # ===============================================================================================
 
@@ -163,25 +196,38 @@ if __name__ == "__main__":
 
         # =============================================================================================================
 
-        if compressionPercentage:
+        if compressionPercentage or compressionFileSize:
             videoProbe = ffmpeg.probe(f'{f}.{inputExtension}')
             try: # Try and get the bitrate of the video coming in. This will catch if only an audio file's coming in.
                 actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'video')['bit_rate'])
             except StopIteration: # Case: Input file has NO video stream, so the bitrate will be pulled from the audio instead.
                 actualBitrate = int(next(stream for stream in videoProbe['streams'] if stream['codec_type'] == 'audio')['bit_rate'])
 
-            # Keep it lower than how it came in, but above 1000K
-            targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - compressionPercentage) / 100) ) )
-
+            if compressionPercentage:
+                # Keep it lower than how it came in, but above 1000K
+                targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - compressionPercentage) / 100) ) )
+            else:
+                sourceFilesize = os.path.getsize(inputFilename) # 65355856 -> 65.4MB
+                calculatedCompressionPct = math.ceil( (1 - (compressionFileSize * 1000000 / sourceFilesize) ) * 100) + 3 # Add 3-ish to the percentage to ensure under target file-size
+                targetBitrate = max(1000, min(actualBitrate, actualBitrate * ( (100 - calculatedCompressionPct) / 100) ) )
         # =============================================================================================================
 
         inputPath = f"{f}.{inputExtension}"
 
-        if compressionPercentage:
-            ffmpeg.input(inputPath).output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate).run()
-        else:
-            ffmpeg.input(inputPath).output(calculatedOutputPath, af=audioFilter, ac=2).run()
+        ffmpegObject = ffmpeg.input(inputPath)
 
+        if horizontalFlipFlag:
+            ffmpegObject = ffmpeg.hflip(ffmpegObject)
+
+        if verticalFlipFlag:
+            ffmpegObject = ffmpeg.vflip(ffmpegObject)
+        
+        if compressionPercentage or compressionFileSize:
+            ffmpegObject = ffmpegObject.output(calculatedOutputPath, af=audioFilter, ac=2, b=targetBitrate)
+        else:
+            ffmpegObject = ffmpegObject.output(calculatedOutputPath, af=audioFilter, ac=2)
+
+        ffmpegObject.run()
         # ============================================================================================
 
         if inputPath == calculatedOutputPath[1:]:
@@ -196,3 +242,6 @@ if __name__ == "__main__":
         fileCounter += 1
 
     # ===============================================================================================
+
+if __name__ == "__main__":
+    convert()

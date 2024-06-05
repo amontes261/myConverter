@@ -3,7 +3,7 @@ A simple Python converter that utilizes [FFMPEG](https://pypi.org/project/ffmpeg
 
 ### Usage
 
-`python convert.py <input_file> <outpuf_file> [ flags ]`
+     python convert.py <input_file> <outpuf_file> [ flags ]
 
 #### Flags
 
@@ -16,14 +16,14 @@ A simple Python converter that utilizes [FFMPEG](https://pypi.org/project/ffmpeg
 
 ### Examples
 
-\> *Coming Soon*
+     python convert.py
 
 <hr>
 
 ### Future Plans/Ideas
 
 - [ ] Add support to specify individual files (middleground between converting a singular file and using \_all\_)
-- [ ] Horizontally or vertically flip input-file(s)
+- [ ] Find a **STABLE** way to compress an input file so the output file's size meets/is below a specified threshold
 <hr>
 
 ### Completed Features
@@ -36,9 +36,13 @@ A simple Python converter that utilizes [FFMPEG](https://pypi.org/project/ffmpeg
 
      **\> Added as `-mkdir` flag**
 
-- [x] Compress output-file
+- [x] Compress output-file given a compression percentage
 
      **\> Added as `-c` flag**
+
+- [x] Compress output-file given a target filesize
+
+     **\> Added as a BETA command via `-fs` flag**
 
 - [x] Specify conversion-order when converting more than 1 file
 
@@ -47,3 +51,7 @@ A simple Python converter that utilizes [FFMPEG](https://pypi.org/project/ffmpeg
 - [x] Focus stereo input toward one channel, outputting as either as left or right dual-mono
 
      **\> Added as `-left` and `-right` flags, respectively**
+
+- [x] Flip inputted file over X and/or Y axis
+
+     **\> Added as `-vflip` and `-hflip` flags, respectively**
