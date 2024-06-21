@@ -1,6 +1,7 @@
 import ffmpeg
 import math
 import os
+import send2trash
 import sys
 
 # =============================================================================================================
@@ -232,10 +233,10 @@ def convert():
 
         if inputPath == calculatedOutputPath[1:]:
             # Remove '.' from beginning of converted file once input-file of the same name is deleted
-            os.remove(inputPath)
+            send2trash.send2trash(inputPath)
             os.rename(calculatedOutputPath, calculatedOutputPath[1:])
         elif deletionFlag:
-            os.remove(inputPath)
+            send2trash.send2trash(inputPath)
 
         # ========================================
 
